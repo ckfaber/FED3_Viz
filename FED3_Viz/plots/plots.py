@@ -605,7 +605,7 @@ def average_plot_onstart(FEDs, groups, dependent, average_bins, average_error,
                 df = file.data.groupby(pd.Grouper(key='Elapsed_Time',freq=average_bins,
                                                   base=0))
                 y = df.apply(resample_get_yvals, dependent)
-                y = y.reindex(longest_index)          
+                y = y.reindex(longest_index)
                 y.index = [time.total_seconds()/3600 for time in y.index]
                 if np.nanmax(y.index) > maxx:
                     maxx=np.nanmax(y.index)
@@ -684,7 +684,6 @@ def average_cumupoke_onstart(FEDs, groups, average_bins, average_error,
                 y = pd.Series([1 if i==True else np.nan for i in pokes]).cumsum()
                 y.index = df['Elapsed_Time']
                 y = y.groupby(pd.Grouper(freq=average_bins,base=0,)).max()
-                return y
                 y = y.fillna(method='ffill')
                 y.index = y.index.to_pytimedelta()    
                 y = y.reindex(longest_index)
