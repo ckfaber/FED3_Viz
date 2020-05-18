@@ -90,7 +90,8 @@ def shade_darkness(ax, min_date,max_date,lights_on,lights_off,
 def resample_get_yvals(df, value):
     possible = ['pellets','retrieval time','interpellet intervals',
                 'correct pokes','errors','correct pokes (%)','errors (%)',
-                'poke bias (correct - error)', 'poke bias (left - right)']
+                'poke bias (correct - error)', 'poke bias (left - right)',
+                'poke bias (cumulative)']
     assert value in possible, 'Value not understood by daynight plot: ' + value
     if value == 'pellets':
         output = df['Binary_Pellets'].sum()
@@ -114,6 +115,8 @@ def resample_get_yvals(df, value):
             output = np.nan
     elif value == 'poke bias (correct - error)':
         output = list(df['Correct_Poke']).count(True) - list(df['Correct_Poke']).count(False)
+    elif value == 'poke bias (cumulative)':
+        output = (df['Left_Poke_Count']- df['Right_Poke_Count']).mean()
     return output      
 
 def raw_data_scatter(array, xcenter, spread):    
@@ -422,7 +425,7 @@ def group_interpellet_interval_plot(FEDs, groups, kde, *args, **kwargs):
     
     return fig
 
-#---Average Pellet Plots
+#---Average Plots
 
 def average_plot_ondatetime(FEDs, groups, dependent, average_bins, average_error, shade_dark,
                             lights_on, lights_off,*args, **kwargs):
@@ -646,6 +649,83 @@ def average_plot_onstart(FEDs, groups, dependent, average_bins, average_error,
         ax.set_ylim(-abs(maxy)*1.1, abs(maxy)*1.1)
         ax.axhline(y=0, linestyle='--', color='gray', zorder=2)     
     title = ('Average Plot of ' + dependent.capitalize())
+    ax.set_title(title)
+    ax.legend(bbox_to_anchor=(1,1), loc='upper left')
+    plt.tight_layout()     
+    
+    return fig
+
+def average_cumupoke_onstart(FEDs, groups, average_bins, average_error,
+                              *args, **kwargs):
+    show_indvl=False
+    if average_error == 'raw data':
+        average_error = 'None'
+        show_indvl=True
+    longest_index = []
+    for file in FEDs:
+        assert isinstance(file, FED3_File),'Non FED3_File passed to pellet_average_onstart()'
+        df = file.data
+        resampled = df.resample(average_bins, base=0, on='Elapsed_Time').sum()
+        if len(longest_index) == 0:
+            longest_index = resampled.index
+        elif len(resampled.index) > len(longest_index):
+            longest_index = resampled.index
+    longest_index=longest_index.to_pytimedelta()
+    fig, ax = plt.subplots(figsize=(7,3.5), dpi=150)
+    colors = plt.rcParams['axes.prop_cycle'].by_key()['color']
+    maxy=0
+    maxx=0
+    for i, group in enumerate(groups):
+        avg = []
+        for file in FEDs:
+            if group in file.group:
+                df = file.data
+                pokes = df['Correct_Poke']
+                y = pd.Series([1 if i==True else np.nan for i in pokes]).cumsum()
+                y.index = df['Elapsed_Time']
+                y = y.groupby(pd.Grouper(freq=average_bins,base=0,)).max()
+                return y
+                y = y.fillna(method='ffill')
+                y.index = y.index.to_pytimedelta()    
+                y = y.reindex(longest_index)
+                y.index = [time.total_seconds()/3600 for time in y.index]
+                if np.nanmax(y.index) > maxx:
+                    maxx=np.nanmax(y.index)
+                avg.append(y)
+                if show_indvl:
+                    x = y.index
+                    ax.plot(x, y, color=colors[i], alpha=.3, linewidth=.8)                  
+        group_avg = np.nanmean(avg, axis=0)
+        if average_error == 'None':
+            label = group
+        else:
+            label = group + ' (±' + average_error + ')'
+        x = y.index
+        y = group_avg
+        ax.plot(x, y, label=label, color=colors[i],)
+        if average_error != 'None':
+            if average_error == 'STD':
+                error_shade = np.nanstd(avg, axis=0)
+            elif average_error == 'SEM':
+                error_shade = stats.sem(avg, axis=0, nan_policy='omit')  
+            ax.fill_between(x,
+                            group_avg+error_shade,
+                            group_avg-error_shade,
+                            alpha = .3,
+                            color=colors[i])
+            if np.nanmax(np.abs(group_avg) + error_shade) > maxy:
+                maxy = np.nanmax(np.abs(group_avg) + error_shade)
+    ax.set_xlabel('Time (h since recording start)')
+    number_of_days = int(maxx//24)
+    if number_of_days > 2:
+        days_in_hours = [24*day for day in range(number_of_days+1)]
+        ax.set_xticks(days_in_hours)
+    else:
+        days_in_sixes = [6*quart for quart in range((number_of_days+1)*4)]
+        ax.set_xticks(days_in_sixes)
+    ax.xaxis.set_minor_locator(AutoMinorLocator()) 
+    ax.set_ylabel('Cumulative Correct Pokes')     
+    title = ('Average Plot of Cumulative Correct Pokes')
     ax.set_title(title)
     ax.legend(bbox_to_anchor=(1,1), loc='upper left')
     plt.tight_layout()     

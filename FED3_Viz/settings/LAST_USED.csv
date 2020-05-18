@@ -3,7 +3,7 @@ shade_dark,True
 lights_on,7 am
 lights_off,7 pm
 allgroups,False
-abs_group,True
+abs_group,False
 skip_duplicates,True
 overwrite,False
 weirdwarn,True
@@ -31,4 +31,4 @@ break_style,pellets
 break_hours,1
 break_mins,0
 break_error,SEM
-break_show_indvl,False
+break_show_indvl,True
