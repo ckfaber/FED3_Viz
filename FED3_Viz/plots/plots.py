@@ -117,6 +117,7 @@ def resample_get_yvals(df, value):
         output = list(df['Correct_Poke']).count(True) - list(df['Correct_Poke']).count(False)
     elif value == 'poke bias (cumulative)':
         output = (df['Left_Poke_Count']- df['Right_Poke_Count']).mean()
+        output = (df['Left_Poke_Count'].max()- df['Right_Poke_Count'].max())
     return output      
 
 def raw_data_scatter(array, xcenter, spread):    
